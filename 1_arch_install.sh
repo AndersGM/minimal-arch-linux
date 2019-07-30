@@ -1,12 +1,20 @@
 #!/bin/bash
 
-encryption_passphrase=""
-root_password=""
-user_password=""
-hostname=""
-user_name=""
-continent_city=""
-swap_size="8"
+echo "Encryption assphrase"
+read encryption_passphrase
+
+echo "root_password"
+read root_password
+echo "user password"
+read user_password
+echo "hostname"
+read hostname
+echo "user name"
+read user_name
+echo "Continent/City (Europe/Copenhagen)"
+read continent_city
+echo "sway size (number)"
+read swap_size
 
 echo "Updating system clock"
 timedatectl set-ntp true
