@@ -20,19 +20,19 @@ echo "Updating system clock"
 timedatectl set-ntp true
 
 echo "Creating partition tables"
-printf "n\n1\n4096\n+512M\nef00\nw\ny\n" | gdisk /dev/nvme0n1
-printf "n\n2\n\n\n8e00\nw\ny\n" | gdisk /dev/nvme0n1
+printf "n\n1\n4096\n+512M\nef00\nw\ny\n" | gdisk /dev/sda
+printf "n\n2\n\n\n8e00\nw\ny\n" | gdisk /dev/sda
 
 echo "Zeroing partitions"
-cat /dev/zero > /dev/nvme0n1p1
-cat /dev/zero > /dev/nvme0n1p2
+#cat /dev/zero > /dev/nvme0n1p1
+#cat /dev/zero > /dev/nvme0n1p2
 
 echo "Building EFI filesystem"
-yes | mkfs.fat -F32 /dev/nvme0n1p1
+yes | mkfs.fat -F32 /dev/sda1
 
 echo "Setting up cryptographic volume"
-printf "%s" "$encryption_passphrase" | cryptsetup -c aes-xts-plain64 -h sha512 -s 512 --use-random --type luks2 --label LVMPART luksFormat /dev/nvme0n1p2
-printf "%s" "$encryption_passphrase" | cryptsetup luksOpen /dev/nvme0n1p2 cryptoVols
+printf "%s" "$encryption_passphrase" | cryptsetup -c aes-xts-plain64 -h sha512 -s 512 --use-random --type luks2 --label LVMPART luksFormat /dev/sda2
+printf "%s" "$encryption_passphrase" | cryptsetup luksOpen /dev/sda2 cryptoVols
 
 echo "Setting up LVM"
 pvcreate /dev/mapper/cryptoVols
@@ -47,7 +47,7 @@ yes | mkfs.ext4 /dev/mapper/Arch-root
 echo "Mounting root/boot and enabling swap"
 mount /dev/mapper/Arch-root /mnt
 mkdir /mnt/boot
-mount /dev/nvme0n1p1 /mnt/boot
+mount /dev/sda1 /mnt/boot
 swapon /dev/mapper/Arch-swap
 
 echo "Installing Arch Linux"
@@ -103,30 +103,6 @@ initrd /initramfs-linux.img
 options cryptdevice=LABEL=LVMPART:cryptoVols root=/dev/mapper/Arch-root resume=/dev/mapper/Arch-swap quiet rw
 END
 
-echo "Setting up Pacman hook for automatic systemd-boot updates"
-mkdir -p /etc/pacman.d/hooks/
-touch /etc/pacman.d/hooks/systemd-boot.hook
-tee -a /etc/pacman.d/hooks/systemd-boot.hook << END
-[Trigger]
-Type = Package
-Operation = Upgrade
-Target = systemd
-
-[Action]
-Description = Updating systemd-boot
-When = PostTransaction
-Exec = /usr/bin/bootctl update
-END
-
-echo "Enabling autologin"
-mkdir -p  /etc/systemd/system/getty@tty1.service.d/
-touch /etc/systemd/system/getty@tty1.service.d/override.conf
-tee -a /etc/systemd/system/getty@tty1.service.d/override.conf << END
-[Service]
-ExecStart=
-ExecStart=-/usr/bin/agetty --autologin $user_name --noclear %I $TERM
-END
-
 echo "Updating mirrors list"
 cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.BAK
 reflector --latest 200 --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
@@ -146,10 +122,10 @@ Exec = /bin/sh -c "reflector --latest 200 --age 12 --protocol https --sort rate 
 END
 
 echo "Enabling periodic TRIM"
-systemctl enable fstrim.timer
+#systemctl enable fstrim.timer
 
 echo "Enabling NetworkManager"
-systemctl enable NetworkManager
+#systemctl enable NetworkManager
 
 echo "Adding user as a sudoer"
 echo '%wheel ALL=(ALL) ALL' | EDITOR='tee -a' visudo
